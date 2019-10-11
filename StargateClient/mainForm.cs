@@ -129,8 +129,5 @@ namespace StargateClient {
 			Processes.Add(process);
 		}
 
-		private void MainForm_Load(object sender, EventArgs e) {
-
-		}
 	}
 }

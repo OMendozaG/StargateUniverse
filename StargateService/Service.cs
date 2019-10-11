@@ -23,9 +23,9 @@ using Titanium.Web.Proxy.Models;
 namespace StargateService {
 	public partial class StargateUniverseService : ServiceBase {
 
-		IniData ini;
+		IniData config;
 		HttpServer http;
-		int nextport = 5410;
+		
 
 		IDictionary<string, Dictionary<string, dynamic>> ProxiesConfig = new Dictionary<string, Dictionary<string, dynamic>>();
 		IDictionary<string, ProxyServer> Proxies = new Dictionary<string, ProxyServer>();
@@ -36,43 +36,54 @@ namespace StargateService {
 
 		protected override void OnStart(string[] args) {
 			FileIniDataParser parser = new FileIniDataParser();
-			ini = parser.ReadFile(AppDomain.CurrentDomain.BaseDirectory + "config.ini", System.Text.Encoding.UTF8);
+			config = parser.ReadFile(AppDomain.CurrentDomain.BaseDirectory + "config.ini", System.Text.Encoding.UTF8);
 
+			int portPointer = 5410;
 
 			http = new HttpServer();
-			http.EndPoint = new IPEndPoint(IPAddress.Loopback, nextport);
+			http.EndPoint = new IPEndPoint(IPAddress.Loopback, portPointer);
 			http.RequestReceived += HTTPRequest;
 			http.Start();
 
-			foreach (SectionData section in ini.Sections) {
-				try {
-					nextport++;
-					string ip = section.SectionName;
-					int port = nextport;
-					if (ProxiesConfig.ContainsKey(ip)) { continue; }
+			foreach (SectionData section in config.Sections) {
 				
-					ProxyServer proxy = new ProxyServer();
-					proxy.AddEndPoint(new ExplicitProxyEndPoint(IPAddress.Loopback, port, false));
-					proxy.UpStreamEndPoint = new IPEndPoint(IPAddress.Parse(ip), 0);
-					proxy.Start();
+				portPointer++;
+				string ip = section.SectionName;
+				int port = portPointer;
+				if (ProxiesConfig.ContainsKey(ip)) { continue; }
 
+				bool failed = false;
+				for (int retry = 0; retry <= 1; retry++) {
 
-					Proxies.Add(ip, proxy);
-					ProxiesConfig.Add(ip, new Dictionary<string, dynamic>());
+					failed = false;
 
+					try {
+						ProxyServer proxy = new ProxyServer();
+						proxy.AddEndPoint(new ExplicitProxyEndPoint(IPAddress.Loopback, port, false));
+						proxy.UpStreamEndPoint = new IPEndPoint(IPAddress.Parse(ip), 0);
+						proxy.Start();
 
-					ProxiesConfig[ip].Add("ip", ip);
-					ProxiesConfig[ip].Add("port", port);
-					foreach (KeyData key in section.Keys) {
-						if (ProxiesConfig[ip].ContainsKey(key.KeyName.ToLower())) { continue; }
-						ProxiesConfig[ip].Add(key.KeyName.ToLower(), key.Value);
+						Proxies.Add(ip, proxy);
+						ProxiesConfig.Add(ip, new Dictionary<string, dynamic>());
+					} catch {
+						failed = true;
+						continue;
 					}
-					
-				} catch {
+
+					break;
 				}
 
-			}
+				if (failed) { continue; }
 
+
+				ProxiesConfig[ip].Add("ip", ip);
+				ProxiesConfig[ip].Add("port", port);
+
+				foreach (KeyData key in section.Keys) {
+					if (ProxiesConfig[ip].ContainsKey(key.KeyName.ToLower())) { continue; }
+					ProxiesConfig[ip].Add(key.KeyName.ToLower(), key.Value);
+				}
+			}
 		}
 
 		public void onDebug() {
@@ -85,7 +96,6 @@ namespace StargateService {
 
 
 		private void HTTPRequest(object sender, HttpRequestEventArgs e) {
-
 			string response = "";
 			string file = e.Request.Url.AbsolutePath.ToLower();
 
@@ -93,45 +103,43 @@ namespace StargateService {
 			file = (!file.EndsWith("/")) ? file : file.Substring(0, file.Length - 1);
 
 
+			//IP Map
+				if (file == "map") {
+					List<IDictionary<string, dynamic>> list = new List<IDictionary<string, dynamic>>();
 
-			if (file == "map") {
-				List<IDictionary<string, dynamic>> list = new List<IDictionary<string, dynamic>>();
+					foreach (KeyValuePair<string, Dictionary<string, dynamic>> proxyInfo in ProxiesConfig) {
+						list.Add(proxyInfo.Value);
+					}
 
-				foreach (KeyValuePair<string, Dictionary<string, dynamic>> proxyInfo in ProxiesConfig) {
-					list.Add(proxyInfo.Value);
+					response = JsonConvert.SerializeObject(list);
 				}
-
-				response = JsonConvert.SerializeObject(list);
-			}
 
 
 
 			/* TODO: que se pueda hacer una peticion utiulizando el name de la ip que se quiere o la ip. Y que se creeen chrometabs en el servicio con el chache del cliente
 			//NOTA: esto será más complicado por que tendras que iniciar instancias de si mismo o del client idk
-			if ((file == "rrequest") && (e.Request.QueryString.AllKeys.Contains("url"))) {
-				string url = e.Request.QueryString["url"];
-				string data = (!e.Request.QueryString.AllKeys.Contains("params")) ? "" : e.Request.QueryString["params"];
+				if ((file == "rrequest") && (e.Request.QueryString.AllKeys.Contains("url"))) {
+					string url = e.Request.QueryString["url"];
+					string data = (!e.Request.QueryString.AllKeys.Contains("params")) ? "" : e.Request.QueryString["params"];
 
-				//Helper.RunAndWait(async () => { await webview.Chromium.EvaluateScriptAsync("eval", new object[] { rrequestScript }); });
-				//JavascriptResponse jsResponse = Helper.RunAndWaitReturn(async () => { return await webview.Chromium.EvaluateScriptAsync("rrequest", new object[] { url, data }); });
+					//Helper.RunAndWait(async () => { await webview.Chromium.EvaluateScriptAsync("eval", new object[] { rrequestScript }); });
+					//JavascriptResponse jsResponse = Helper.RunAndWaitReturn(async () => { return await webview.Chromium.EvaluateScriptAsync("rrequest", new object[] { url, data }); });
 
-				//response = jsResponse.Result.ToString();
-			} */
-
+					//response = jsResponse.Result.ToString();
+				} */
 
 
 			//SYSTEM INFO
-			if (file == "sysinfo") {
-				string drives = "";
-				if (e.Request.QueryString.AllKeys.Contains("drives")) {
-					foreach (char drive in e.Request.QueryString["drives"].ToLower()) {
-						drives += ((drives == "") ? "" : ",") + "\"" + drive.ToString() + "\":" +  SystemInfo.GetDiskUsagePercent(drive.ToString()).ToString(CultureInfo.InvariantCulture); 
+				if (file == "sysinfo") {
+					string drives = "";
+					if (e.Request.QueryString.AllKeys.Contains("drives")) {
+						foreach (char drive in e.Request.QueryString["drives"].ToLower()) {
+							drives += ((drives == "") ? "" : ",") + "\"" + drive.ToString() + "\":" +  SystemInfo.GetDiskUsagePercent(drive.ToString()).ToString(CultureInfo.InvariantCulture); 
+						}
 					}
+
+					response = "{\"cpu\":" + SystemInfo.GetCPUUsagePercent().ToString(CultureInfo.InvariantCulture) + ",\"hd\":" +  SystemInfo.GetDiskUsagePercent("c").ToString(CultureInfo.InvariantCulture) + ",\"hds\":{" + drives + "},\"ram\":" +  SystemInfo.GetRamUsagePercent().ToString(CultureInfo.InvariantCulture) + "}";
 				}
-
-				response = "{\"cpu\":" + SystemInfo.GetCPUUsagePercent().ToString(CultureInfo.InvariantCulture) + ",\"hd\":" +  SystemInfo.GetDiskUsagePercent("c").ToString(CultureInfo.InvariantCulture) + ",\"hds\":{" + drives + "},\"ram\":" +  SystemInfo.GetRamUsagePercent().ToString(CultureInfo.InvariantCulture) + "}";
-			}
-
 
 
 			using (var writer = new StreamWriter(e.Response.OutputStream)) { writer.Write((response != "") ? response : "Stargate Request Error"); }
