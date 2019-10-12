@@ -13,6 +13,7 @@ using Arya;
 using Arya.Win;
 using IniParser;
 using IniParser.Model;
+using System.Threading;
 
 namespace StargateClient {
 	public partial class WebForm : Form {
@@ -34,7 +35,7 @@ namespace StargateClient {
 
 			string[] args = Environment.GetCommandLineArgs();
 			host =  Program.serverHost;
-			Int32.TryParse(args[1], out int port);
+			Int32.TryParse(args[1], out port);
 			ip = args[2];
 			name = args[3];
 			account = args[4];
@@ -124,7 +125,11 @@ namespace StargateClient {
 			this.CenterToScreen();
 			this.BringToFront();
 
-			webview.Driver.Navigate("https://google.com");
+			webview.Driver.Navigate("about:blank");
+			A.Helper.RunOnThread(() => {
+				Thread.Sleep(500);
+				webview.Driver.Navigate("https://google.com");
+			});
 		}
 
 		private void ButtonForward_Click(object sender, EventArgs e) {

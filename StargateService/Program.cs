@@ -70,7 +70,7 @@ namespace StargateService {
 
 			ServiceBase[] ServicesToRun;
 			ServicesToRun = new ServiceBase[] {
-				
+				new StargateUniverseService()
 			};
 
 
