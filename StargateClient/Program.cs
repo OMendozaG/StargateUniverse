@@ -20,10 +20,16 @@ namespace StargateClient {
 		[STAThread]
 		static void Main() {
 
+			string[] args = Environment.GetCommandLineArgs();
+
 			try {
 				IniData ini = new FileIniDataParser().ReadFile("client.ini");
 				if ((ini.Sections.ContainsSection("server")) && (ini["server"].ContainsKey("host"))) {
 					serverHost = ini["server"]["host"];
+				}
+
+				if (args.Length <= 2) {
+					serverHost = args[1];
 				}
 			} catch { }
 
@@ -32,17 +38,10 @@ namespace StargateClient {
 			Application.EnableVisualStyles();
 			Application.SetCompatibleTextRenderingDefault(false);
 
-			string[] args = Environment.GetCommandLineArgs();
+		
 
-			if (args.Length <= 1) {
-				using (Mutex mutex = new Mutex(false, "Global\\StargateUniverseClientMain")) {
-					if (!mutex.WaitOne(0, false)) {
-						Process.GetCurrentProcess().Kill();
-						return;
-					}
-
-					Application.Run(new MainForm());
-				}
+			if (args.Length <= 2) {
+				Application.Run(new MainForm());
 			} else {
 				Application.Run(new WebForm());
 			}

@@ -34,12 +34,12 @@ namespace StargateClient {
 			InitializeComponent();
 
 			string[] args = Environment.GetCommandLineArgs();
-			host =  Program.serverHost;
-			Int32.TryParse(args[1], out port);
-			ip = args[2];
-			name = args[3];
-			account = args[4];
+			host =  args[1];
+			Int32.TryParse(args[2], out port);
+			ip = args[3];
+			name = args[4];
 			description = args[5];
+			account = args[6];
 
 			Text = name + ((name != "") ? " @ " : "") + ip;
 
@@ -127,7 +127,7 @@ namespace StargateClient {
 
 			webview.Driver.Navigate("about:blank");
 			A.Helper.RunOnThread(() => {
-				Thread.Sleep(500);
+				Thread.Sleep(600);
 				webview.Driver.Navigate("https://google.com");
 			});
 		}

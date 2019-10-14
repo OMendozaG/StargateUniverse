@@ -28,7 +28,6 @@ namespace StargateClient {
 		public MainForm() {
 			InitializeComponent();
 
-			serverTooStrip.Text = Program.serverHost + ":5410";
 			UpdateMap();
 		}
 
@@ -48,22 +47,38 @@ namespace StargateClient {
 				A.Helper.RunOnMainThread(this, () => {
 					mapView.Items.Clear();
 
+					int index = 0;
+					while (menuTray.Items.ContainsKey("proxyOpen" + index.ToString())) {
+						menuTray.Items.RemoveByKey("proxyOpen" + index.ToString());
+						index++;
+					}
+
+
 					if ((response == "") || (!response.StartsWith("["))) { this.Text = "Stargate Universe (Error connecting " +  Program.serverHost + ":5410)"; return; }
 					this.Text = "Stargate Universe @ " +  Program.serverHost + ":5410";
 
 					List<IDictionary<string, dynamic>> list = JsonConvert.DeserializeObject<List<IDictionary<string, dynamic>>>(response);
 
 					foreach (IDictionary<string, dynamic> proxyConfig in list) { try {
-							ListViewItem item = new ListViewItem();
-							item.Text = proxyConfig["port"].ToString();
-							item.SubItems.Add(proxyConfig["ip"]);
-							item.SubItems.Add((proxyConfig.ContainsKey("name")) ? proxyConfig["name"] : "");
-							item.SubItems.Add((proxyConfig.ContainsKey("account")) ? proxyConfig["account"] : "");
-							item.SubItems.Add((proxyConfig.ContainsKey("description")) ? proxyConfig["description"] : "");
-							mapView.Items.Add(item);
+						ListViewItem item = new ListViewItem();
+						item.Text = Program.serverHost;
+						item.SubItems.Add(proxyConfig["port"].ToString());
+						item.SubItems.Add(proxyConfig["ip"]);
+						item.SubItems.Add((proxyConfig.ContainsKey("name")) ? proxyConfig["name"] : "");
+						item.SubItems.Add((proxyConfig.ContainsKey("description")) ? proxyConfig["description"] : "");
+						item.SubItems.Add((proxyConfig.ContainsKey("account")) ? proxyConfig["account"] : "");
+						mapView.Items.Add(item);
 
-							if (!ProxiesConfig.ContainsKey(proxyConfig["ip"])) { proxyConfig.Add(proxyConfig["ip"], proxyConfig); }
-							ProxiesConfig[proxyConfig["ip"]] = proxyConfig;
+						ToolStripMenuItem toolItem = new ToolStripMenuItem();
+						toolItem.Name = "proxyOpen" + (mapView.Items.Count - 1).ToString();
+						toolItem.Tag = mapView.Items.Count -1;
+						toolItem.Text = ((proxyConfig.ContainsKey("name")) ? proxyConfig["name"] : proxyConfig["ip"]) + ((proxyConfig.ContainsKey("description")) ? " (" + proxyConfig["description"] + ")" : "");
+						toolItem.Click += ToolProxi_Open;
+
+						menuTray.Items.Insert(menuTray.Items.Count - 2, toolItem);
+
+						if (!ProxiesConfig.ContainsKey(proxyConfig["ip"])) { proxyConfig.Add(proxyConfig["ip"], proxyConfig); }
+						ProxiesConfig[proxyConfig["ip"]] = proxyConfig;
 
 					} catch { } }
 
@@ -121,9 +136,18 @@ namespace StargateClient {
 		private void MapView_DoubleClick(object sender, EventArgs e) {
 			if (mapView.SelectedItems.Count != 1) { return; }
 
+			RunProxiByMapId(mapView.SelectedItems[0].Index);
+		}
+
+
+		private void ToolProxi_Open(object sender, EventArgs e) {
+			RunProxiByMapId((int)((ToolStripMenuItem)sender).Tag);
+		}
+
+		private void RunProxiByMapId(int index) {
 			Process process = new Process();
 			process.StartInfo.FileName = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
-			process.StartInfo.Arguments = "\"" + mapView.SelectedItems[0].SubItems[0].Text  + "\"" + " \"" + mapView.SelectedItems[0].SubItems[1].Text + "\"" + " \"" + mapView.SelectedItems[0].SubItems[2].Text + "\"" + " \"" + mapView.SelectedItems[0].SubItems[3].Text + "\"" + " \"" + mapView.SelectedItems[0].SubItems[4].Text + "\"";
+			process.StartInfo.Arguments = "\"" + mapView.Items[index].SubItems[0].Text  + "\"" + " \"" + mapView.Items[index].SubItems[1].Text + "\" \"" + mapView.Items[index].SubItems[2].Text + "\"" + " \"" + mapView.Items[index].SubItems[3].Text + "\"" + " \"" + mapView.Items[index].SubItems[4].Text + "\"" + " \"" + mapView.Items[index].SubItems[5].Text + "\"";
 			process.Start();
 
 			Processes.Add(process);
